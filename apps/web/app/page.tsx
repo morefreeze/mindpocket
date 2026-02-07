@@ -14,11 +14,6 @@ const SidebarLeft = dynamic(() => import("@/components/sidebar-left").then((m) =
   ssr: false,
 })
 
-const SidebarRight = dynamic(
-  () => import("@/components/sidebar-right").then((m) => m.SidebarRight),
-  { ssr: false }
-)
-
 export default function Web() {
   return (
     <SidebarProvider>
@@ -31,9 +26,7 @@ export default function Web() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbPage className="line-clamp-1">
-                    Project Management & Task Tracking
-                  </BreadcrumbPage>
+                  <BreadcrumbPage className="line-clamp-1">所有收藏</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -44,7 +37,6 @@ export default function Web() {
           <div className="mx-auto h-[100vh] w-full max-w-3xl rounded-xl bg-muted/50" />
         </div>
       </SidebarInset>
-      <SidebarRight />
     </SidebarProvider>
   )
 }

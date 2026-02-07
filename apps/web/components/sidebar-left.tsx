@@ -1,270 +1,258 @@
 "use client"
 
 import {
-  AudioWaveform,
-  Blocks,
-  Calendar,
-  Command,
-  Home,
-  Inbox,
-  MessageCircleQuestion,
+  Bookmark,
+  Brain,
+  ChevronRight,
+  Github,
+  LayoutDashboard,
+  MessageSquare,
+  Pin,
+  Plus,
   Search,
-  Settings2,
   Sparkles,
-  Trash2,
+  Twitter,
 } from "lucide-react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 import type * as React from "react"
 
-import { NavFavorites } from "@/components/nav-favorites"
-import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
-import { NavWorkspaces } from "@/components/nav-workspaces"
-import { TeamSwitcher } from "@/components/team-switcher"
-import { Sidebar, SidebarContent, SidebarHeader, SidebarRail } from "@/components/ui/sidebar"
+import { NavUser } from "@/components/nav-user"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarRail,
+  SidebarSeparator,
+} from "@/components/ui/sidebar"
 
-// This is sample data.
-const data = {
-  teams: [
-    {
-      name: "Acme Inc",
-      logo: Command,
-      plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
-    },
-  ],
-  navMain: [
-    {
-      title: "Search",
-      url: "#",
-      icon: Search,
-    },
-    {
-      title: "Ask AI",
-      url: "#",
-      icon: Sparkles,
-    },
-    {
-      title: "Home",
-      url: "#",
-      icon: Home,
-      isActive: true,
-    },
-    {
-      title: "Inbox",
-      url: "#",
-      icon: Inbox,
-      badge: "10",
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Calendar",
-      url: "#",
-      icon: Calendar,
-    },
-    {
-      title: "Settings",
-      url: "#",
-      icon: Settings2,
-    },
-    {
-      title: "Templates",
-      url: "#",
-      icon: Blocks,
-    },
-    {
-      title: "Trash",
-      url: "#",
-      icon: Trash2,
-    },
-    {
-      title: "Help",
-      url: "#",
-      icon: MessageCircleQuestion,
-    },
-  ],
-  favorites: [
-    {
-      name: "Project Management & Task Tracking",
-      url: "#",
-      emoji: "📊",
-    },
-    {
-      name: "Family Recipe Collection & Meal Planning",
-      url: "#",
-      emoji: "🍳",
-    },
-    {
-      name: "Fitness Tracker & Workout Routines",
-      url: "#",
-      emoji: "💪",
-    },
-    {
-      name: "Book Notes & Reading List",
-      url: "#",
-      emoji: "📚",
-    },
-    {
-      name: "Sustainable Gardening Tips & Plant Care",
-      url: "#",
-      emoji: "🌱",
-    },
-    {
-      name: "Language Learning Progress & Resources",
-      url: "#",
-      emoji: "🗣️",
-    },
-    {
-      name: "Home Renovation Ideas & Budget Tracker",
-      url: "#",
-      emoji: "🏠",
-    },
-    {
-      name: "Personal Finance & Investment Portfolio",
-      url: "#",
-      emoji: "💰",
-    },
-    {
-      name: "Movie & TV Show Watchlist with Reviews",
-      url: "#",
-      emoji: "🎬",
-    },
-    {
-      name: "Daily Habit Tracker & Goal Setting",
-      url: "#",
-      emoji: "✅",
-    },
-  ],
-  workspaces: [
-    {
-      name: "Personal Life Management",
-      emoji: "🏠",
-      pages: [
-        {
-          name: "Daily Journal & Reflection",
-          url: "#",
-          emoji: "📔",
-        },
-        {
-          name: "Health & Wellness Tracker",
-          url: "#",
-          emoji: "🍏",
-        },
-        {
-          name: "Personal Growth & Learning Goals",
-          url: "#",
-          emoji: "🌟",
-        },
-      ],
-    },
-    {
-      name: "Professional Development",
-      emoji: "💼",
-      pages: [
-        {
-          name: "Career Objectives & Milestones",
-          url: "#",
-          emoji: "🎯",
-        },
-        {
-          name: "Skill Acquisition & Training Log",
-          url: "#",
-          emoji: "🧠",
-        },
-        {
-          name: "Networking Contacts & Events",
-          url: "#",
-          emoji: "🤝",
-        },
-      ],
-    },
-    {
-      name: "Creative Projects",
-      emoji: "🎨",
-      pages: [
-        {
-          name: "Writing Ideas & Story Outlines",
-          url: "#",
-          emoji: "✍️",
-        },
-        {
-          name: "Art & Design Portfolio",
-          url: "#",
-          emoji: "🖼️",
-        },
-        {
-          name: "Music Composition & Practice Log",
-          url: "#",
-          emoji: "🎵",
-        },
-      ],
-    },
-    {
-      name: "Home Management",
-      emoji: "🏡",
-      pages: [
-        {
-          name: "Household Budget & Expense Tracking",
-          url: "#",
-          emoji: "💰",
-        },
-        {
-          name: "Home Maintenance Schedule & Tasks",
-          url: "#",
-          emoji: "🔧",
-        },
-        {
-          name: "Family Calendar & Event Planning",
-          url: "#",
-          emoji: "📅",
-        },
-      ],
-    },
-    {
-      name: "Travel & Adventure",
-      emoji: "🧳",
-      pages: [
-        {
-          name: "Trip Planning & Itineraries",
-          url: "#",
-          emoji: "🗺️",
-        },
-        {
-          name: "Travel Bucket List & Inspiration",
-          url: "#",
-          emoji: "🌎",
-        },
-        {
-          name: "Travel Journal & Photo Gallery",
-          url: "#",
-          emoji: "📸",
-        },
-      ],
-    },
-  ],
+// TODO: 从数据库获取用户信息
+const user = {
+  name: "Admin",
+  email: "admin@mindpocket.com",
+  avatar: "",
 }
 
+// 系统默认文件夹（固定置顶，不可删除）
+const systemFolders = [
+  {
+    name: "聊天记录",
+    id: "chats",
+    pinned: true,
+    items: [
+      { name: "关于 React 性能优化", id: "chat-1" },
+      { name: "Next.js 部署方案讨论", id: "chat-2" },
+      { name: "RAG 原理解析", id: "chat-3" },
+    ],
+  },
+]
+
+// TODO: 从数据库获取文件夹列表
+const userFolders = [
+  {
+    name: "前端开发",
+    emoji: "💻",
+    id: "frontend",
+    items: [
+      { name: "React 19 新特性总结", id: "item-1" },
+      { name: "Tailwind CSS 最佳实践", id: "item-2" },
+    ],
+  },
+  {
+    name: "AI 论文",
+    emoji: "🤖",
+    id: "ai-papers",
+    items: [{ name: "Attention Is All You Need", id: "item-3" }],
+  },
+  { name: "设计灵感", emoji: "🎨", id: "design", items: [] },
+  { name: "读书笔记", emoji: "📚", id: "reading", items: [] },
+]
+
+const socialLinks = [
+  { name: "GitHub", icon: Github, url: "https://github.com" },
+  { name: "Twitter", icon: Twitter, url: "https://twitter.com" },
+]
+
 export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const pathname = usePathname()
+
   return (
     <Sidebar className="border-r-0" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
-        <NavMain items={data.navMain} />
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild size="lg">
+              <Link href="/">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                  <Brain className="size-4" />
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">MindPocket</span>
+                  <span className="truncate text-muted-foreground text-xs">口袋大脑</span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+
+        {/* 主导航 */}
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={pathname === "/chat"}>
+              <Link href="/chat">
+                <Sparkles />
+                <span>AI 对话</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={pathname === "/search"}>
+              <Link href="/search">
+                <Search />
+                <span>搜索</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={pathname === "/dashboard"}>
+              <Link href="/dashboard">
+                <LayoutDashboard />
+                <span>数据看板</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={pathname === "/"}>
+              <Link href="/">
+                <Bookmark />
+                <span>所有收藏</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
+
+      <SidebarSeparator />
+
       <SidebarContent>
-        <NavFavorites favorites={data.favorites} />
-        <NavWorkspaces workspaces={data.workspaces} />
-        <NavSecondary className="mt-auto" items={data.navSecondary} />
+        {/* 文件夹分类 */}
+        <SidebarGroup>
+          <SidebarGroupLabel>文件夹</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {/* 系统默认文件夹 - 置顶 */}
+              {systemFolders.map((folder) => (
+                <Collapsible key={folder.id}>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname === `/folders/${folder.id}`}>
+                      <Link href={`/folders/${folder.id}`}>
+                        <MessageSquare className="size-4" />
+                        <span>{folder.name}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuAction>
+                        <ChevronRight className="transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      </SidebarMenuAction>
+                    </CollapsibleTrigger>
+                    <Pin className="pointer-events-none absolute right-7 top-1/2 size-3 -translate-y-1/2 text-muted-foreground/50" />
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {folder.items.map((item) => (
+                          <SidebarMenuSubItem key={item.id}>
+                            <SidebarMenuSubButton asChild>
+                              <Link href={`/chat/${item.id}`}>
+                                <span>{item.name}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              ))}
+
+              {/* 用户自建文件夹 */}
+              {userFolders.map((folder) => (
+                <Collapsible key={folder.id}>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname === `/folders/${folder.id}`}>
+                      <Link href={`/folders/${folder.id}`}>
+                        <span>{folder.emoji}</span>
+                        <span>{folder.name}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                    {folder.items.length > 0 && (
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuAction>
+                          <ChevronRight className="transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                        </SidebarMenuAction>
+                      </CollapsibleTrigger>
+                    )}
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {folder.items.map((item) => (
+                          <SidebarMenuSubItem key={item.id}>
+                            <SidebarMenuSubButton asChild>
+                              <Link href={`/items/${item.id}`}>
+                                <span>{item.name}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              ))}
+
+              <SidebarMenuItem>
+                <SidebarMenuButton className="text-sidebar-foreground/70">
+                  <Plus className="size-4" />
+                  <span>新建文件夹</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
+
+      <SidebarSeparator />
+
+      <SidebarFooter>
+        {/* 用户信息 */}
+        <NavUser user={user} />
+
+        {/* 社交媒体链接 */}
+        <div className="flex items-center gap-1 px-2 py-1">
+          {socialLinks.map((link) => (
+            <a
+              className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              href={link.url}
+              key={link.name}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <link.icon className="size-4" />
+              <span className="sr-only">{link.name}</span>
+            </a>
+          ))}
+        </div>
+      </SidebarFooter>
+
       <SidebarRail />
     </Sidebar>
   )
