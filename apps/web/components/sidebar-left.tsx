@@ -6,16 +6,19 @@ import {
   ChevronRight,
   Github,
   LayoutDashboard,
+  Loader2,
   MessageSquare,
-  Pin,
   Plus,
   Search,
   Sparkles,
+  Trash2,
   Twitter,
 } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import type * as React from "react"
+import { useCallback, useEffect, useState } from "react"
+import { toast } from "sonner"
 
 import { NavUser } from "@/components/nav-user"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -38,47 +41,25 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 
-// TODO: 从数据库获取用户信息
-const user = {
-  name: "Admin",
-  email: "admin@mindpocket.com",
-  avatar: "",
+interface ChatItem {
+  id: string
+  title: string
+  createdAt: string
 }
 
-// 系统默认文件夹（固定置顶，不可删除）
-const systemFolders = [
-  {
-    name: "聊天记录",
-    id: "chats",
-    pinned: true,
-    items: [
-      { name: "关于 React 性能优化", id: "chat-1" },
-      { name: "Next.js 部署方案讨论", id: "chat-2" },
-      { name: "RAG 原理解析", id: "chat-3" },
-    ],
-  },
-]
+interface FolderItem {
+  id: string
+  name: string
+  emoji: string
+  sortOrder: number
+  items: { id: string; title: string }[]
+}
 
-// TODO: 从数据库获取文件夹列表
-const userFolders = [
-  {
-    name: "前端开发",
-    emoji: "💻",
-    id: "frontend",
-    items: [
-      { name: "React 19 新特性总结", id: "item-1" },
-      { name: "Tailwind CSS 最佳实践", id: "item-2" },
-    ],
-  },
-  {
-    name: "AI 论文",
-    emoji: "🤖",
-    id: "ai-papers",
-    items: [{ name: "Attention Is All You Need", id: "item-3" }],
-  },
-  { name: "设计灵感", emoji: "🎨", id: "design", items: [] },
-  { name: "读书笔记", emoji: "📚", id: "reading", items: [] },
-]
+interface UserInfo {
+  name: string
+  email: string
+  avatar: string
+}
 
 const socialLinks = [
   { name: "GitHub", icon: Github, url: "https://github.com" },
@@ -87,6 +68,93 @@ const socialLinks = [
 
 export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
+  const router = useRouter()
+  const [chats, setChats] = useState<ChatItem[]>([])
+  const [isLoadingChats, setIsLoadingChats] = useState(true)
+  const [folders, setFolders] = useState<FolderItem[]>([])
+  const [isLoadingFolders, setIsLoadingFolders] = useState(true)
+  const [userInfo, setUserInfo] = useState<UserInfo>({ name: "", email: "", avatar: "" })
+
+  // 初始加载文件夹和用户信息（只加载一次）
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const [foldersRes, userRes] = await Promise.all([fetch("/api/folders"), fetch("/api/user")])
+        if (cancelled) {
+          return
+        }
+
+        if (foldersRes.ok) {
+          const data = await foldersRes.json()
+          setFolders(data.folders)
+        }
+        if (userRes.ok) {
+          const data = await userRes.json()
+          setUserInfo(data)
+        }
+      } catch {
+        // silently fail
+      } finally {
+        if (!cancelled) {
+          setIsLoadingFolders(false)
+        }
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // 聊天记录随 pathname 变化重新加载
+  useEffect(() => {
+    // pathname 变化时触发重新加载（如创建/删除聊天后）
+    const _path = pathname
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch("/api/history?limit=20")
+        if (res.ok && !cancelled) {
+          setChats((await res.json()).chats)
+        }
+      } catch {
+        // silently fail
+      } finally {
+        if (!cancelled) {
+          setIsLoadingChats(false)
+        }
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [pathname])
+
+  const handleDeleteChat = useCallback(
+    async (e: React.MouseEvent, chatId: string) => {
+      e.preventDefault()
+      e.stopPropagation()
+      try {
+        const res = await fetch("/api/chat", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: chatId }),
+        })
+        if (res.ok) {
+          setChats((prev) => prev.filter((c) => c.id !== chatId))
+          if (pathname === `/chat/${chatId}`) {
+            router.push("/chat")
+          }
+          toast.success("已删除对话")
+        }
+      } catch {
+        toast.error("删除失败")
+      }
+    },
+    [pathname, router]
+  )
 
   return (
     <Sidebar className="border-r-0" {...props}>
@@ -147,77 +215,100 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       <SidebarSeparator />
 
       <SidebarContent>
+        {/* 聊天记录 */}
+        <SidebarGroup>
+          <SidebarGroupLabel>
+            <MessageSquare className="mr-1 size-3" />
+            聊天记录
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {isLoadingChats && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton disabled>
+                    <Loader2 className="size-4 animate-spin" />
+                    <span>加载中...</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {!isLoadingChats && chats.length === 0 && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton disabled>
+                    <span className="text-muted-foreground text-xs">暂无对话</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {!isLoadingChats &&
+                chats.length > 0 &&
+                chats.map((chat) => (
+                  <SidebarMenuItem key={chat.id}>
+                    <SidebarMenuButton asChild isActive={pathname === `/chat/${chat.id}`}>
+                      <Link href={`/chat/${chat.id}`}>
+                        <span className="truncate">{chat.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                    <SidebarMenuAction onClick={(e) => handleDeleteChat(e, chat.id)}>
+                      <Trash2 className="size-3" />
+                    </SidebarMenuAction>
+                  </SidebarMenuItem>
+                ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         {/* 文件夹分类 */}
         <SidebarGroup>
           <SidebarGroupLabel>文件夹</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {/* 系统默认文件夹 - 置顶 */}
-              {systemFolders.map((folder) => (
-                <Collapsible key={folder.id}>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname === `/folders/${folder.id}`}>
-                      <Link href={`/folders/${folder.id}`}>
-                        <MessageSquare className="size-4" />
-                        <span>{folder.name}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuAction>
-                        <ChevronRight className="transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                      </SidebarMenuAction>
-                    </CollapsibleTrigger>
-                    <Pin className="pointer-events-none absolute right-7 top-1/2 size-3 -translate-y-1/2 text-muted-foreground/50" />
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {folder.items.map((item) => (
-                          <SidebarMenuSubItem key={item.id}>
-                            <SidebarMenuSubButton asChild>
-                              <Link href={`/chat/${item.id}`}>
-                                <span>{item.name}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              ))}
-
-              {/* 用户自建文件夹 */}
-              {userFolders.map((folder) => (
-                <Collapsible key={folder.id}>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname === `/folders/${folder.id}`}>
-                      <Link href={`/folders/${folder.id}`}>
-                        <span>{folder.emoji}</span>
-                        <span>{folder.name}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                    {folder.items.length > 0 && (
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuAction>
-                          <ChevronRight className="transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                        </SidebarMenuAction>
-                      </CollapsibleTrigger>
-                    )}
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {folder.items.map((item) => (
-                          <SidebarMenuSubItem key={item.id}>
-                            <SidebarMenuSubButton asChild>
-                              <Link href={`/items/${item.id}`}>
-                                <span>{item.name}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              ))}
+              {isLoadingFolders && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton disabled>
+                    <Loader2 className="size-4 animate-spin" />
+                    <span>加载中...</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {!isLoadingFolders && folders.length === 0 && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton disabled>
+                    <span className="text-muted-foreground text-xs">暂无文件夹</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {!isLoadingFolders &&
+                folders.map((f) => (
+                  <Collapsible key={f.id}>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname === `/folders/${f.id}`}>
+                        <Link href={`/folders/${f.id}`}>
+                          <span>{f.emoji}</span>
+                          <span>{f.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                      {f.items.length > 0 && (
+                        <CollapsibleTrigger asChild>
+                          <SidebarMenuAction>
+                            <ChevronRight className="transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                          </SidebarMenuAction>
+                        </CollapsibleTrigger>
+                      )}
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {f.items.map((item) => (
+                            <SidebarMenuSubItem key={item.id}>
+                              <SidebarMenuSubButton asChild>
+                                <Link href={`/items/${item.id}`}>
+                                  <span>{item.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                ))}
 
               <SidebarMenuItem>
                 <SidebarMenuButton className="text-sidebar-foreground/70">
@@ -234,7 +325,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
 
       <SidebarFooter>
         {/* 用户信息 */}
-        <NavUser user={user} />
+        <NavUser user={userInfo} />
 
         {/* 社交媒体链接 */}
         <div className="flex items-center gap-1 px-2 py-1">

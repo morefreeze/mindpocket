@@ -7,7 +7,14 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["!node_modules", "!dist", "!.next", "!.expo", "!.turbo"]
+    "includes": [
+      "!node_modules",
+      "!dist",
+      "!.next",
+      "!.expo",
+      "!.turbo",
+      "!.agents"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -33,7 +40,7 @@
   },
   "overrides": [
     {
-      "includes": ["**/components/ui/**"],
+      "includes": ["**/components/ui/**", "**/components/ai-elements/**"],
       "linter": {
         "enabled": false
       },
@@ -42,6 +49,16 @@
       },
       "assist": {
         "enabled": false
+      }
+    },
+    {
+      "includes": ["**/db/schema/index.ts"],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noBarrelFile": "off"
+          }
+        }
       }
     }
   ],
