@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm"
-import { boolean, index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core"
+import { boolean, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core"
 import { user } from "./auth"
 import { folder } from "./folder"
 import { bookmarkTag } from "./tag"
@@ -22,6 +22,16 @@ export const bookmark = pgTable(
     coverImage: text("cover_image"),
     metadata: jsonb("metadata"),
     isFavorite: boolean("is_favorite").notNull().default(false),
+    sourceType: text("source_type"),
+    fileUrl: text("file_url"),
+    fileExtension: text("file_extension"),
+    fileSize: integer("file_size"),
+    ingestStatus: text("ingest_status").notNull().default("pending"),
+    ingestError: text("ingest_error"),
+    platform: text("platform"),
+    author: text("author"),
+    language: text("language"),
+    sourceCreatedAt: timestamp("source_created_at"),
     isArchived: boolean("is_archived").notNull().default(false),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")

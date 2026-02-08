@@ -1,16 +1,7 @@
 "use client"
 
-import {
-  ExternalLink,
-  FileText,
-  Folder,
-  Heart,
-  Image,
-  Link2,
-  MoreHorizontal,
-  Video,
-} from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { ExternalLink, FileText, Heart, Image, Link2, MoreHorizontal, Video } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -54,9 +45,9 @@ function getRelativeTime(dateStr: string) {
   const now = Date.now()
   const date = new Date(dateStr).getTime()
   const diff = now - date
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
+  const minutes = Math.floor(diff / 60_000)
+  const hours = Math.floor(diff / 3_600_000)
+  const days = Math.floor(diff / 86_400_000)
   const weeks = Math.floor(days / 7)
   const months = Math.floor(days / 30)
 
@@ -88,14 +79,12 @@ export function BookmarkCard({ item }: { item: BookmarkItem }) {
   const gradient = getGradientFromUrl(item.url)
 
   return (
-    <a
+    <Link
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-xl border bg-card",
         "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
       )}
-      href={item.url || "#"}
-      rel="noopener noreferrer"
-      target="_blank"
+      href={`/bookmark/${item.id}`}
     >
       {/* 封面图 */}
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-muted">
@@ -127,9 +116,11 @@ export function BookmarkCard({ item }: { item: BookmarkItem }) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={(e) => e.preventDefault()}>
-              <DropdownMenuItem>
-                <ExternalLink className="mr-2 size-3.5" />
-                在新标签页打开
+              <DropdownMenuItem asChild>
+                <a href={item.url || "#"} rel="noopener noreferrer" target="_blank">
+                  <ExternalLink className="mr-2 size-3.5" />
+                  在新标签页打开
+                </a>
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <Heart className="mr-2 size-3.5" />
@@ -174,6 +165,6 @@ export function BookmarkCard({ item }: { item: BookmarkItem }) {
           {item.isFavorite && <Heart className="size-3 fill-red-500 text-red-500" />}
         </div>
       </div>
-    </a>
+    </Link>
   )
 }

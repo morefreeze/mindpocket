@@ -1,6 +1,6 @@
 import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
 import { getBookmarksByUserId } from "@/db/queries/bookmark"
+import { auth } from "@/lib/auth"
 
 export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: await headers() })

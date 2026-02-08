@@ -313,7 +313,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
               )}
               {!isLoadingFolders &&
                 folders.map((f) => (
-                  <Collapsible key={f.id}>
+                  <Collapsible className="group/collapsible" key={f.id}>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={pathname === `/folders/${f.id}`}>
                         <Link href={`/folders/${f.id}`}>
@@ -321,19 +321,17 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
                           <span>{f.name}</span>
                         </Link>
                       </SidebarMenuButton>
-                      {f.items.length > 0 && (
-                        <CollapsibleTrigger asChild>
-                          <SidebarMenuAction>
-                            <ChevronRight className="transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                          </SidebarMenuAction>
-                        </CollapsibleTrigger>
-                      )}
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuAction>
+                          <ChevronRight className="transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                        </SidebarMenuAction>
+                      </CollapsibleTrigger>
                       <CollapsibleContent>
                         <SidebarMenuSub>
                           {f.items.map((item) => (
                             <SidebarMenuSubItem key={item.id}>
                               <SidebarMenuSubButton asChild>
-                                <Link href={`/items/${item.id}`}>
+                                <Link href={`/bookmark/${item.id}`}>
                                   <span>{item.title}</span>
                                 </Link>
                               </SidebarMenuSubButton>

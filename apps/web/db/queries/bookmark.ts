@@ -69,6 +69,40 @@ export async function getBookmarksByUserId({
   }
 }
 
+export async function getBookmarkById({ id, userId }: { id: string; userId: string }) {
+  const result = await db
+    .select({
+      id: bookmark.id,
+      type: bookmark.type,
+      title: bookmark.title,
+      description: bookmark.description,
+      url: bookmark.url,
+      content: bookmark.content,
+      coverImage: bookmark.coverImage,
+      isFavorite: bookmark.isFavorite,
+      sourceType: bookmark.sourceType,
+      fileUrl: bookmark.fileUrl,
+      fileExtension: bookmark.fileExtension,
+      ingestStatus: bookmark.ingestStatus,
+      ingestError: bookmark.ingestError,
+      platform: bookmark.platform,
+      author: bookmark.author,
+      language: bookmark.language,
+      sourceCreatedAt: bookmark.sourceCreatedAt,
+      createdAt: bookmark.createdAt,
+      updatedAt: bookmark.updatedAt,
+      folderId: bookmark.folderId,
+      folderName: folder.name,
+      folderEmoji: folder.emoji,
+    })
+    .from(bookmark)
+    .leftJoin(folder, eq(bookmark.folderId, folder.id))
+    .where(and(eq(bookmark.id, id), eq(bookmark.userId, userId)))
+    .limit(1)
+
+  return result[0] ?? null
+}
+
 export async function getBookmarkTags(bookmarkId: string) {
   return db
     .select({ id: tag.id, name: tag.name, color: tag.color })

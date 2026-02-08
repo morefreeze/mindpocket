@@ -1,0 +1,118 @@
+import { headers } from "next/headers"
+import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
+import { ingestFromExtension, ingestFromFile, ingestFromUrl } from "@/lib/ingest/pipeline"
+import { ingestExtensionSchema, ingestUrlSchema } from "@/lib/ingest/types"
+
+export const maxDuration = 120
+
+const ALLOWED_EXTENSIONS = [
+  ".pdf",
+  ".docx",
+  ".doc",
+  ".xlsx",
+  ".xls",
+  ".csv",
+  ".html",
+  ".htm",
+  ".xml",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".mp3",
+  ".wav",
+  ".ipynb",
+  ".zip",
+]
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024
+const FILE_EXT_REGEX = /\.[^.]+$/
+
+export async function POST(request: Request) {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const userId = session.user.id
+  const contentType = request.headers.get("content-type") ?? ""
+
+  try {
+    if (contentType.includes("multipart/form-data")) {
+      return await handleFileUpload(request, userId)
+    }
+
+    return await handleJsonIngest(request, userId)
+  } catch (error) {
+    console.error("[ingest] Unexpected error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+async function handleJsonIngest(request: Request, userId: string) {
+  const body = await request.json()
+
+  if (body.html) {
+    const parsed = ingestExtensionSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid request", details: parsed.error.flatten() },
+        { status: 400 }
+      )
+    }
+    const result = await ingestFromExtension({
+      userId,
+      url: parsed.data.url,
+      html: parsed.data.html,
+      folderId: parsed.data.folderId,
+      title: parsed.data.title,
+    })
+    return NextResponse.json(result, { status: result.status === "failed" ? 422 : 201 })
+  }
+
+  const parsed = ingestUrlSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid request", details: parsed.error.flatten() },
+      { status: 400 }
+    )
+  }
+  const result = await ingestFromUrl({
+    userId,
+    url: parsed.data.url,
+    folderId: parsed.data.folderId,
+    title: parsed.data.title,
+  })
+  return NextResponse.json(result, { status: result.status === "failed" ? 422 : 201 })
+}
+
+async function handleFileUpload(request: Request, userId: string) {
+  const formData = await request.formData()
+  const file = formData.get("file") as File | null
+  const folderId = formData.get("folderId") as string | null
+  const title = formData.get("title") as string | null
+
+  if (!file) {
+    return NextResponse.json({ error: "No file provided" }, { status: 400 })
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    return NextResponse.json({ error: "File size exceeds 50MB limit" }, { status: 400 })
+  }
+
+  const ext = file.name.match(FILE_EXT_REGEX)?.[0]?.toLowerCase() ?? ""
+  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    return NextResponse.json({ error: `Unsupported file type: ${ext}` }, { status: 400 })
+  }
+
+  const result = await ingestFromFile({
+    userId,
+    file,
+    folderId: folderId ?? undefined,
+    title: title ?? undefined,
+  })
+
+  return NextResponse.json(result, { status: result.status === "failed" ? 422 : 201 })
+}

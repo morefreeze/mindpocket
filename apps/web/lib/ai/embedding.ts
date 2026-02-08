@@ -1,6 +1,6 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
-import { cosineDistance, desc, gt, sql } from "drizzle-orm"
 import { embed, embedMany } from "ai"
+import { cosineDistance, desc, gt, sql } from "drizzle-orm"
 import { nanoid } from "nanoid"
 import { db } from "@/db/client"
 import { embedding } from "@/db/schema/embedding"
@@ -29,6 +29,8 @@ export async function generateEmbedding(value: string): Promise<number[]> {
   return vector
 }
 
+const EMBED_BATCH_SIZE = 10
+
 export async function generateEmbeddings(
   bookmarkId: string,
   content: string
@@ -36,12 +38,18 @@ export async function generateEmbeddings(
   const chunks = generateChunks(content)
   if (chunks.length === 0) return []
 
-  const { embeddings } = await embedMany({
-    model: embeddingModel,
-    values: chunks,
-  })
+  const allEmbeddings: number[][] = []
 
-  return embeddings.map((vector, i) => ({
+  for (let i = 0; i < chunks.length; i += EMBED_BATCH_SIZE) {
+    const batch = chunks.slice(i, i + EMBED_BATCH_SIZE)
+    const { embeddings } = await embedMany({
+      model: embeddingModel,
+      values: batch,
+    })
+    allEmbeddings.push(...embeddings)
+  }
+
+  return allEmbeddings.map((vector, i) => ({
     id: nanoid(),
     bookmarkId,
     content: chunks[i]!,

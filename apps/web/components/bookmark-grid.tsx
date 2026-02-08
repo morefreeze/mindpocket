@@ -11,6 +11,7 @@ import {
   Search,
   Video,
 } from "lucide-react"
+import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { BookmarkCard, type BookmarkItem } from "@/components/bookmark-card"
 import { Button } from "@/components/ui/button"
@@ -28,7 +29,7 @@ const typeFilters = [
 
 type ViewMode = "grid" | "list"
 
-export function BookmarkGrid() {
+export function BookmarkGrid({ refreshKey, folderId }: { refreshKey?: number; folderId?: string }) {
   const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [total, setTotal] = useState(0)
@@ -42,13 +43,14 @@ export function BookmarkGrid() {
 
   const fetchBookmarks = useCallback(
     async (offset = 0, append = false) => {
-      if (!append) setIsLoading(true)
-      else setIsLoadingMore(true)
+      if (append) setIsLoadingMore(true)
+      else setIsLoading(true)
 
       try {
         const params = new URLSearchParams()
         if (activeType !== "all") params.set("type", activeType)
         if (search) params.set("search", search)
+        if (folderId) params.set("folderId", folderId)
         params.set("limit", "20")
         params.set("offset", String(offset))
 
@@ -66,12 +68,18 @@ export function BookmarkGrid() {
         setIsLoadingMore(false)
       }
     },
-    [activeType, search]
+    [activeType, search, folderId]
   )
 
   useEffect(() => {
     fetchBookmarks()
   }, [fetchBookmarks])
+
+  useEffect(() => {
+    if (refreshKey) {
+      fetchBookmarks()
+    }
+  }, [refreshKey, fetchBookmarks])
 
   const handleSearch = useCallback(() => {
     setSearch(searchInput)
@@ -230,11 +238,9 @@ function BookmarkListItem({ item }: { item: BookmarkItem }) {
   }
 
   return (
-    <a
+    <Link
       className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
-      href={item.url || "#"}
-      rel="noopener noreferrer"
-      target="_blank"
+      href={`/bookmark/${item.id}`}
     >
       <TypeIcon className="size-4 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1 truncate text-sm">{item.title}</span>
@@ -250,7 +256,7 @@ function BookmarkListItem({ item }: { item: BookmarkItem }) {
       <span className="shrink-0 text-muted-foreground text-xs">
         {new Date(item.createdAt).toLocaleDateString("zh-CN")}
       </span>
-    </a>
+    </Link>
   )
 }
 
