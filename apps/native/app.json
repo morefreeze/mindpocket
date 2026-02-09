@@ -47,8 +47,7 @@
           }
         }
       ],
-      "expo-secure-store",
-      "expo-share-intent"
+      "expo-secure-store"
     ]
   }
 }
