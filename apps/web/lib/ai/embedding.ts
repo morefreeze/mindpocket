@@ -8,7 +8,7 @@ import { embedding } from "@/db/schema/embedding"
 
 const aliyun = createOpenAICompatible({
   name: "aliyun",
-  apiKey: process.env.DASHSCOPE_API_KEY!,
+  apiKey: process.env.EMBEDDING_API_KEY!,
   baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
 })
 
