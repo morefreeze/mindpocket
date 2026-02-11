@@ -27,7 +27,7 @@ function getCookie(): string {
     .join("; ")
 }
 
-function createHeaders(extra?: Record<string, string>): Record<string, string> {
+export function createHeaders(extra?: Record<string, string>): Record<string, string> {
   const headers: Record<string, string> = { ...(extra || {}) }
   if (IS_WEB) {
     return headers

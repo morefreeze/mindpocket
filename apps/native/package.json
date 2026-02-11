@@ -21,6 +21,7 @@
     "ai": "^6.0.77",
     "expo": "~54.0.33",
     "expo-constants": "~18.0.13",
+    "expo-document-picker": "~14.0.8",
     "expo-linking": "~8.0.11",
     "expo-modules-core": "^3.0.29",
     "expo-network": "^8.0.8",
