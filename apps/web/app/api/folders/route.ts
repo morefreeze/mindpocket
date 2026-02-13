@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm"
+import { and, eq, inArray, sql } from "drizzle-orm"
 import { nanoid } from "nanoid"
 import { headers } from "next/headers"
 import { db } from "@/db/client"
@@ -76,6 +76,41 @@ export async function POST(request: Request) {
     })
 
   return Response.json({ folder: { ...newFolder[0], items: [] } }, { status: 201 })
+}
+
+export async function PATCH(request: Request) {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) {
+    return new Response("Unauthorized", { status: 401 })
+  }
+
+  const body = await request.json()
+  const orderedIds = Array.isArray(body.orderedIds) ? body.orderedIds : []
+  if (orderedIds.length === 0) {
+    return Response.json({ error: "orderedIds is required" }, { status: 400 })
+  }
+
+  // 验证所有 folder 都属于当前用户
+  const userFolders = await db
+    .select({ id: folder.id })
+    .from(folder)
+    .where(and(eq(folder.userId, session.user.id), inArray(folder.id, orderedIds)))
+
+  if (userFolders.length !== orderedIds.length) {
+    return Response.json({ error: "Invalid folder ids" }, { status: 400 })
+  }
+
+  // 批量更新 sortOrder
+  await Promise.all(
+    orderedIds.map((id: string, index: number) =>
+      db
+        .update(folder)
+        .set({ sortOrder: index })
+        .where(and(eq(folder.id, id), eq(folder.userId, session.user.id)))
+    )
+  )
+
+  return Response.json({ success: true })
 }
 
 export async function DELETE(request: Request) {

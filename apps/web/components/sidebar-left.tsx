@@ -1,8 +1,25 @@
 "use client"
 
 import {
+  DndContext,
+  type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core"
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import {
   Bookmark,
   Folder,
+  GripVertical,
   Import,
   LayoutDashboard,
   Loader2,
@@ -10,6 +27,7 @@ import {
   MoreHorizontal,
   Plus,
   Search,
+  SmilePlus,
   Sparkles,
   Trash2,
 } from "lucide-react"
@@ -34,6 +52,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  EmojiPicker,
+  EmojiPickerContent,
+  EmojiPickerFooter,
+  EmojiPickerSearch,
+} from "@/components/ui/emoji-picker"
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import {
   Sidebar,
   SidebarContent,
@@ -100,6 +125,16 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
   const [newFolderName, setNewFolderName] = useState("")
   const newFolderInputRef = useRef<HTMLInputElement>(null)
   const [showAllChats, setShowAllChats] = useState(false)
+
+  // dnd-kit state
+  const [activeDrag, setActiveDrag] = useState<{
+    type: "bookmark" | "folder"
+    id: string
+    title: string
+    emoji?: string
+  } | null>(null)
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   // 初始加载文件夹和用户信息（只加载一次）
   useEffect(() => {
@@ -261,6 +296,143 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
     [pathname, router, t]
   )
 
+  const handleEmojiChange = useCallback(
+    async (folderId: string, emoji: string) => {
+      const prevFolders = folders
+      setFolders((prev) => prev.map((f) => (f.id === folderId ? { ...f, emoji } : f)))
+
+      try {
+        const res = await fetch(`/api/folders/${folderId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emoji }),
+        })
+        if (!res.ok) {
+          setFolders(prevFolders)
+          toast.error(t.sidebar.emojiChangeFailed)
+        }
+      } catch {
+        setFolders(prevFolders)
+        toast.error(t.sidebar.emojiChangeFailed)
+      }
+    },
+    [folders, t]
+  )
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const { active } = event
+    const data = active.data.current
+    if (data?.type === "bookmark") {
+      setActiveDrag({ type: "bookmark", id: active.id as string, title: data.title })
+    } else if (data?.type === "folder") {
+      setActiveDrag({
+        type: "folder",
+        id: active.id as string,
+        title: data.name,
+        emoji: data.emoji,
+      })
+    }
+  }, [])
+
+  const moveBookmarkToFolder = useCallback(
+    async (bookmarkId: string, sourceFolderId: string, targetFolderId: string, title: string) => {
+      const prevFolders = folders
+      setFolders((prev) =>
+        prev.map((f) => {
+          if (f.id === sourceFolderId) {
+            return { ...f, items: f.items.filter((item) => item.id !== bookmarkId) }
+          }
+          if (f.id === targetFolderId) {
+            return { ...f, items: [{ id: bookmarkId, title }, ...f.items].slice(0, 5) }
+          }
+          return f
+        })
+      )
+
+      try {
+        const res = await fetch(`/api/bookmarks/${bookmarkId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ folderId: targetFolderId }),
+        })
+        if (res.ok) {
+          toast.success(t.sidebar.bookmarkMoved ?? "已移动")
+        } else {
+          setFolders(prevFolders)
+          toast.error(t.sidebar.bookmarkMoveFailed ?? "移动失败")
+        }
+      } catch {
+        setFolders(prevFolders)
+        toast.error(t.sidebar.bookmarkMoveFailed ?? "移动失败")
+      }
+    },
+    [folders, t]
+  )
+
+  const reorderFolders = useCallback(
+    async (oldIndex: number, newIndex: number) => {
+      const reordered = arrayMove(folders, oldIndex, newIndex)
+      const prevFolders = folders
+      setFolders(reordered)
+
+      try {
+        const res = await fetch("/api/folders", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderedIds: reordered.map((f) => f.id) }),
+        })
+        if (!res.ok) {
+          setFolders(prevFolders)
+          toast.error(t.sidebar.folderReorderFailed ?? "排序失败")
+        }
+      } catch {
+        setFolders(prevFolders)
+        toast.error(t.sidebar.folderReorderFailed ?? "排序失败")
+      }
+    },
+    [folders, t]
+  )
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      setActiveDrag(null)
+      const { active, over } = event
+      if (!over) {
+        return
+      }
+
+      const activeType = active.data.current?.type
+
+      if (activeType === "bookmark") {
+        const bookmarkId = active.data.current?.bookmarkId as string
+        const sourceFolderId = active.data.current?.folderId as string
+        const targetFolderId = over.data.current?.folderId as string
+
+        if (!targetFolderId || targetFolderId === sourceFolderId) {
+          return
+        }
+
+        moveBookmarkToFolder(
+          bookmarkId,
+          sourceFolderId,
+          targetFolderId,
+          active.data.current?.title || ""
+        )
+      }
+
+      if (activeType === "folder") {
+        const oldIndex = folders.findIndex((f) => f.id === active.id)
+        const newIndex = folders.findIndex((f) => f.id === over.id)
+        if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
+          return
+        }
+
+        reorderFolders(oldIndex, newIndex)
+      }
+    },
+    [folders, moveBookmarkToFolder, reorderFolders]
+  )
+
   return (
     <Sidebar className="border-r-0" {...props}>
       <SidebarHeader>
@@ -396,68 +568,94 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
             {t.sidebar.folders}
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {isLoadingFolders && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton disabled>
-                    <Loader2 className="size-4 animate-spin" />
-                    <span>{t.common.loading}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-              {!isLoadingFolders && folders.length === 0 && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton disabled>
-                    <span className="text-muted-foreground text-xs">{t.sidebar.noFolders}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-              {!isLoadingFolders &&
-                folders.map((f) => (
-                  <FolderMenuItem
-                    folder={f}
-                    isActive={pathname === `/folders/${f.id}`}
-                    key={f.id}
-                    onDelete={() => handleDeleteFolder(f.id)}
-                    onDeleteBookmark={handleDeleteBookmark}
-                    t={t}
-                  />
-                ))}
+            <DndContext onDragEnd={handleDragEnd} onDragStart={handleDragStart} sensors={sensors}>
+              <SortableContext
+                items={[
+                  ...folders.map((f) => f.id),
+                  ...folders.flatMap((f) => f.items.map((item) => `bookmark-${item.id}`)),
+                ]}
+                strategy={verticalListSortingStrategy}
+              >
+                <SidebarMenu>
+                  {isLoadingFolders && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton disabled>
+                        <Loader2 className="size-4 animate-spin" />
+                        <span>{t.common.loading}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
+                  {!isLoadingFolders && folders.length === 0 && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton disabled>
+                        <span className="text-muted-foreground text-xs">{t.sidebar.noFolders}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
+                  {!isLoadingFolders &&
+                    folders.map((f) => (
+                      <FolderMenuItem
+                        folder={f}
+                        isActive={pathname === `/folders/${f.id}`}
+                        key={f.id}
+                        onDelete={() => handleDeleteFolder(f.id)}
+                        onDeleteBookmark={handleDeleteBookmark}
+                        onEmojiChange={handleEmojiChange}
+                        t={t}
+                      />
+                    ))}
 
-              <SidebarMenuItem>
-                {isCreatingFolder ? (
-                  <div className="flex items-center gap-2 px-2 py-1">
-                    <span>📁</span>
-                    <input
-                      autoFocus
-                      className="h-6 flex-1 rounded border bg-transparent px-1 text-sm outline-none focus:border-sidebar-primary"
-                      onBlur={handleCreateFolder}
-                      onChange={(e) => setNewFolderName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleCreateFolder()
-                        }
-                        if (e.key === "Escape") {
-                          setIsCreatingFolder(false)
-                          setNewFolderName("")
-                        }
-                      }}
-                      placeholder={t.sidebar.folderPlaceholder}
-                      ref={newFolderInputRef}
-                      value={newFolderName}
-                    />
+                  <SidebarMenuItem>
+                    {isCreatingFolder ? (
+                      <div className="flex items-center gap-2 px-2 py-1">
+                        <span>📁</span>
+                        <input
+                          autoFocus
+                          className="h-6 flex-1 rounded border bg-transparent px-1 text-sm outline-none focus:border-sidebar-primary"
+                          onBlur={handleCreateFolder}
+                          onChange={(e) => setNewFolderName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleCreateFolder()
+                            }
+                            if (e.key === "Escape") {
+                              setIsCreatingFolder(false)
+                              setNewFolderName("")
+                            }
+                          }}
+                          placeholder={t.sidebar.folderPlaceholder}
+                          ref={newFolderInputRef}
+                          value={newFolderName}
+                        />
+                      </div>
+                    ) : (
+                      <SidebarMenuButton
+                        className="text-sidebar-foreground/70"
+                        onClick={() => setIsCreatingFolder(true)}
+                      >
+                        <Plus className="size-4" />
+                        <span>{t.sidebar.newFolder}</span>
+                      </SidebarMenuButton>
+                    )}
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SortableContext>
+
+              <DragOverlay>
+                {activeDrag ? (
+                  <div className="flex items-center gap-2 rounded-md bg-sidebar-accent px-3 py-1.5 text-sm shadow-md">
+                    {activeDrag.type === "folder" ? (
+                      <>
+                        <span>{activeDrag.emoji}</span>
+                        <span>{activeDrag.title}</span>
+                      </>
+                    ) : (
+                      <span className="truncate">{activeDrag.title}</span>
+                    )}
                   </div>
-                ) : (
-                  <SidebarMenuButton
-                    className="text-sidebar-foreground/70"
-                    onClick={() => setIsCreatingFolder(true)}
-                  >
-                    <Plus className="size-4" />
-                    <span>{t.sidebar.newFolder}</span>
-                  </SidebarMenuButton>
-                )}
-              </SidebarMenuItem>
-            </SidebarMenu>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
@@ -537,34 +735,81 @@ function FolderMenuItem({
   isActive,
   onDelete,
   onDeleteBookmark,
+  onEmojiChange,
   t,
 }: {
   folder: FolderItem
   isActive: boolean
   onDelete: () => void
   onDeleteBookmark: (e: React.MouseEvent, bookmarkId: string) => void
+  onEmojiChange: (folderId: string, emoji: string) => void
   t: ReturnType<typeof useT>
 }) {
   const [open, setOpen] = useState(false)
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
+  const emojiPickerOpenedAt = useRef(0)
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
+    useSortable({
+      id: folder.id,
+      data: { type: "folder", name: folder.name, emoji: folder.emoji, folderId: folder.id },
+    })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+  }
 
   return (
     <Collapsible className="group/collapsible">
-      <SidebarMenuItem>
-        <CollapsibleTrigger asChild>
-          <SidebarMenuButton
-            asChild
-            isActive={isActive}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              setOpen(true)
-            }}
-          >
-            <Link href={`/folders/${folder.id}`}>
-              <span>{folder.emoji}</span>
-              <span>{folder.name}</span>
-            </Link>
-          </SidebarMenuButton>
-        </CollapsibleTrigger>
+      <SidebarMenuItem ref={setNodeRef} style={style}>
+        <Popover
+          onOpenChange={(v) => {
+            if (!v && Date.now() - emojiPickerOpenedAt.current < 300) return
+            setEmojiPickerOpen(v)
+          }}
+          open={emojiPickerOpen}
+        >
+          <CollapsibleTrigger asChild>
+            <SidebarMenuButton
+              asChild
+              className={
+                isOver && !isDragging ? "ring-2 ring-primary/50 bg-sidebar-accent" : undefined
+              }
+              isActive={isActive}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setOpen(true)
+              }}
+            >
+              <Link href={`/folders/${folder.id}`}>
+                <PopoverAnchor asChild>
+                  <span
+                    className="cursor-grab active:cursor-grabbing"
+                    {...attributes}
+                    {...listeners}
+                  >
+                    {folder.emoji}
+                  </span>
+                </PopoverAnchor>
+                <span>{folder.name}</span>
+              </Link>
+            </SidebarMenuButton>
+          </CollapsibleTrigger>
+          <PopoverContent align="start" className="w-fit p-0" side="right">
+            <EmojiPicker
+              className="h-[342px]"
+              onEmojiSelect={({ emoji }) => {
+                onEmojiChange(folder.id, emoji)
+                setEmojiPickerOpen(false)
+              }}
+            >
+              <EmojiPickerSearch />
+              <EmojiPickerContent />
+              <EmojiPickerFooter />
+            </EmojiPicker>
+          </PopoverContent>
+        </Popover>
         <DropdownMenu onOpenChange={setOpen} open={open}>
           <DropdownMenuTrigger asChild>
             <SidebarMenuAction className="opacity-0 group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100">
@@ -572,6 +817,18 @@ function FolderMenuItem({
             </SidebarMenuAction>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="right">
+            <DropdownMenuItem
+              onClick={() => {
+                setOpen(false)
+                setTimeout(() => {
+                  emojiPickerOpenedAt.current = Date.now()
+                  setEmojiPickerOpen(true)
+                }, 150)
+              }}
+            >
+              <SmilePlus />
+              <span>{t.sidebar.changeEmoji}</span>
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={onDelete} variant="destructive">
               <Trash2 />
               <span>{t.sidebar.deleteFolder}</span>
@@ -583,6 +840,7 @@ function FolderMenuItem({
             {folder.items.map((item) => (
               <BookmarkMenuItem
                 bookmark={item}
+                folderId={folder.id}
                 key={item.id}
                 onDelete={(e) => onDeleteBookmark(e, item.id)}
                 t={t}
@@ -597,14 +855,21 @@ function FolderMenuItem({
 
 function BookmarkMenuItem({
   bookmark,
+  folderId,
   onDelete,
   t,
 }: {
   bookmark: { id: string; title: string }
+  folderId: string
   onDelete: (e: React.MouseEvent) => void
   t: ReturnType<typeof useT>
 }) {
   const [open, setOpen] = useState(false)
+  const { attributes, listeners, setNodeRef, isDragging } = useSortable({
+    id: `bookmark-${bookmark.id}`,
+    data: { type: "bookmark", bookmarkId: bookmark.id, folderId, title: bookmark.title },
+    disabled: false,
+  })
 
   return (
     <SidebarMenuSubItem
@@ -612,15 +877,20 @@ function BookmarkMenuItem({
         e.preventDefault()
         setOpen(true)
       }}
+      ref={setNodeRef}
+      style={{ opacity: isDragging ? 0.5 : undefined }}
     >
       <SidebarMenuSubButton asChild>
         <Link href={`/bookmark/${bookmark.id}`}>
+          <span className="cursor-grab active:cursor-grabbing" {...attributes} {...listeners}>
+            <GripVertical className="size-3 text-muted-foreground" />
+          </span>
           <span>{bookmark.title}</span>
         </Link>
       </SidebarMenuSubButton>
       <DropdownMenu onOpenChange={setOpen} open={open}>
         <DropdownMenuTrigger asChild>
-          <SidebarMenuAction className="opacity-0 group-focus-within/menu-sub-item:opacity-100 group-hover/menu-sub-item:opacity-100 data-[state=open]:opacity-100">
+          <SidebarMenuAction className="-right-5 opacity-0 group-focus-within/menu-sub-item:opacity-100 group-hover/menu-sub-item:opacity-100 data-[state=open]:opacity-100">
             <MoreHorizontal className="size-3" />
           </SidebarMenuAction>
         </DropdownMenuTrigger>

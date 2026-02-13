@@ -33,6 +33,8 @@ export const zh = {
     deleteBookmark: "删除书签",
     showMore: "显示更多",
     showLess: "收起",
+    changeEmoji: "更换图标",
+    emojiChangeFailed: "更换图标失败",
   },
   settings: {
     title: "设置",

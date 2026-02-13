@@ -35,6 +35,8 @@ export const en: TranslationDict = {
     deleteBookmark: "Delete bookmark",
     showMore: "Show more",
     showLess: "Show less",
+    changeEmoji: "Change emoji",
+    emojiChangeFailed: "Failed to change emoji",
   },
   settings: {
     title: "Settings",
