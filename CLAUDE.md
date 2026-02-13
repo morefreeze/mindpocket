@@ -150,6 +150,10 @@ cd apps/web
 pnpm tsx scripts/create-user.ts your@email.com yourpassword "Your Name"
 ```
 
+
+最新版 nextjs 的 middleware 改名 proxy.ts ，请注意区分
+
+
 ### Turbo 缓存
 
 Turborepo 会缓存构建结果以加速后续构建。如果遇到缓存问题，可以：
@@ -162,6 +166,7 @@ Turborepo 会缓存构建结果以加速后续构建。如果遇到缓存问题�
 后pnpm check
 ``` 
 以确保代码质量。
+
 
 
 ## 参考

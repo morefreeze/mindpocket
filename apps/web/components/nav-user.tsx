@@ -1,7 +1,9 @@
 "use client"
 
 import { ChevronsUpDown, LogOut, MessageCircleQuestionMark, Settings } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { toast } from "sonner"
 
 import { SettingsDialog } from "@/components/settings/settings-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -20,6 +22,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { signOut } from "@/lib/auth-client"
 import { useT } from "@/lib/i18n"
 
 export function NavUser({
@@ -32,6 +35,7 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
   const t = useT()
   const [settingsOpen, setSettingsOpen] = useState(false)
 
@@ -91,7 +95,17 @@ export function NavUser({
                 {t.common.feedback}
               </DropdownMenuItem>
 
-              <DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={async () => {
+                  try {
+                    await signOut()
+                    router.push("/login")
+                    router.refresh()
+                  } catch {
+                    toast.error("退出失败，请稍后重试")
+                  }
+                }}
+              >
                 <LogOut />
                 {t.common.logout}
               </DropdownMenuItem>

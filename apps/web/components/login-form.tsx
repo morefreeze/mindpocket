@@ -75,6 +75,29 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "登录"}
                 </Button>
               </Field>
+              <div className="text-center text-sm text-muted-foreground">
+                还没有账号？
+                <button
+                  className="ml-1 underline underline-offset-4 hover:text-foreground"
+                  onClick={async (e) => {
+                    e.preventDefault()
+                    try {
+                      const res = await fetch("/api/check-registration")
+                      const data = await res.json()
+                      if (data.allowed) {
+                        router.push("/signup")
+                      } else {
+                        toast.error(data.message || "注册已关闭")
+                      }
+                    } catch {
+                      toast.error("无法检查注册状态")
+                    }
+                  }}
+                  type="button"
+                >
+                  去注册
+                </button>
+              </div>
             </FieldGroup>
           </form>
           <AuthBrandDisplay />
