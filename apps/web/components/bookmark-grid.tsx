@@ -29,6 +29,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+import { useBookmarkStore, useUIStore, type ViewMode } from "@/stores"
 
 const typeFilters = [
   { value: "all", label: "全部", icon: null },
@@ -45,7 +46,6 @@ const platformFilters = [
   { value: "bilibili", label: "哔哩哔哩" },
 ] as const
 
-type ViewMode = "grid" | "list"
 const LIST_SKELETON_KEYS = [
   "list-skeleton-1",
   "list-skeleton-2",
@@ -66,59 +66,23 @@ const GRID_SKELETON_KEYS = [
 ]
 
 export function BookmarkGrid({ refreshKey, folderId }: { refreshKey?: number; folderId?: string }) {
-  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [total, setTotal] = useState(0)
-  const [hasMore, setHasMore] = useState(false)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const { bookmarks, filters, pagination, isLoading, isLoadingMore, fetchBookmarks, setFilters } =
+    useBookmarkStore()
+  const { bookmarkViewMode, setBookmarkViewMode } = useUIStore()
 
-  const [activeType, setActiveType] = useState("all")
-  const [activePlatform, setActivePlatform] = useState("all")
-  const [viewMode, setViewMode] = useState<ViewMode>("grid")
+  // Set folderId filter if provided
+  useEffect(() => {
+    if (folderId) {
+      setFilters({ folderId })
+    }
+  }, [folderId, setFilters])
 
-  const fetchBookmarks = useCallback(
-    async (offset = 0, append = false) => {
-      if (append) {
-        setIsLoadingMore(true)
-      } else {
-        setIsLoading(true)
-      }
-
-      try {
-        const params = new URLSearchParams()
-        if (activeType !== "all") {
-          params.set("type", activeType)
-        }
-        if (activePlatform !== "all") {
-          params.set("platform", activePlatform)
-        }
-        if (folderId) {
-          params.set("folderId", folderId)
-        }
-        params.set("limit", "20")
-        params.set("offset", String(offset))
-
-        const res = await fetch(`/api/bookmarks?${params}`)
-        if (res.ok) {
-          const data = await res.json()
-          setBookmarks((prev) => (append ? [...prev, ...data.bookmarks] : data.bookmarks))
-          setTotal(data.total)
-          setHasMore(data.hasMore)
-        }
-      } catch {
-        // silently fail
-      } finally {
-        setIsLoading(false)
-        setIsLoadingMore(false)
-      }
-    },
-    [activeType, activePlatform, folderId]
-  )
-
+  // Initial fetch
   useEffect(() => {
     fetchBookmarks()
   }, [fetchBookmarks])
 
+  // Refresh when refreshKey changes
   useEffect(() => {
     if (refreshKey) {
       fetchBookmarks()
@@ -133,22 +97,22 @@ export function BookmarkGrid({ refreshKey, folderId }: { refreshKey?: number; fo
     <div className="flex flex-col gap-4">
       {/* 筛选栏 */}
       <FilterBar
-        activePlatform={activePlatform}
-        activeType={activeType}
-        onPlatformChange={setActivePlatform}
-        onTypeChange={setActiveType}
-        setViewMode={setViewMode}
-        total={total}
-        viewMode={viewMode}
+        activePlatform={filters.platform}
+        activeType={filters.type}
+        onPlatformChange={(platform) => setFilters({ platform })}
+        onTypeChange={(type) => setFilters({ type })}
+        setViewMode={setBookmarkViewMode}
+        total={pagination.total}
+        viewMode={bookmarkViewMode}
       />
 
       {/* 内容区域 */}
-      {isLoading && <LoadingSkeleton viewMode={viewMode} />}
+      {isLoading && <LoadingSkeleton viewMode={bookmarkViewMode} />}
       {!isLoading && bookmarks.length === 0 && <EmptyState />}
       {!isLoading && bookmarks.length > 0 && (
         <>
-          <BookmarkList bookmarks={bookmarks} viewMode={viewMode} />
-          {hasMore && (
+          <BookmarkList bookmarks={bookmarks} viewMode={bookmarkViewMode} />
+          {pagination.hasMore && (
             <div className="flex justify-center py-4">
               <Button disabled={isLoadingMore} onClick={handleLoadMore} variant="outline">
                 {isLoadingMore && <Loader2 className="mr-2 size-4 animate-spin" />}

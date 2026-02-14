@@ -8,6 +8,7 @@ import type { PromptInputMessage } from "@/components/ai-elements/prompt-input"
 import { ChatInput } from "@/components/chat-input"
 import { ChatMessages } from "@/components/chat-messages"
 import { useT } from "@/lib/i18n"
+import { useChatStore } from "@/stores"
 
 function getGreeting(): string {
   const hour = new Date().getHours()
@@ -34,8 +35,8 @@ export function Chat({
 }) {
   const t = useT()
   const [input, setInput] = useState("")
-  const [selectedModelId, setSelectedModelId] = useState("")
-  const [useKnowledgeBase, setUseKnowledgeBase] = useState(true)
+  const { selectedModelId, useKnowledgeBase, setSelectedModelId, setUseKnowledgeBase } =
+    useChatStore()
   const hasReplacedUrl = useRef(false)
   const greeting = useMemo(() => getGreeting(), [])
   const selectedModelIdRef = useRef(selectedModelId)
@@ -43,8 +44,11 @@ export function Chat({
   const useKnowledgeBaseRef = useRef(useKnowledgeBase)
   useKnowledgeBaseRef.current = useKnowledgeBase
 
-  // Fetch user's default chat model on mount
+  // Fetch user's default chat model on mount (only if not already set)
   useEffect(() => {
+    if (selectedModelId) {
+      return // Already have a model selected from persisted state
+    }
     fetch("/api/ai-providers")
       .then((res) => res.json())
       .then((providers: Array<{ id: string; type: string; isDefault: boolean }>) => {
@@ -58,7 +62,7 @@ export function Chat({
       .catch(() => {
         // ignore fetch errors
       })
-  }, [])
+  }, [selectedModelId, setSelectedModelId])
 
   const transport = useMemo(
     () =>

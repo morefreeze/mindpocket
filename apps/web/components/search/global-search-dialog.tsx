@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/command"
 import { useT } from "@/lib/i18n"
 import type { SearchMatchReason, SearchMode } from "@/lib/search/types"
-import { useSearchDialog } from "./search-dialog-provider"
+import { useUIStore } from "@/stores"
 
 interface SearchResult {
   id: string
@@ -34,7 +34,8 @@ const SEARCH_MODES: SearchMode[] = ["keyword", "semantic", "hybrid"]
 export function GlobalSearchDialog() {
   const router = useRouter()
   const t = useT()
-  const { open, setOpen, mode, setMode } = useSearchDialog()
+  const { searchDialog, closeSearchDialog, setSearchMode } = useUIStore()
+  const { open, mode } = searchDialog
   const [input, setInput] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -122,7 +123,7 @@ export function GlobalSearchDialog() {
     <CommandDialog
       className="max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border-border/60 bg-background/95 p-0 shadow-2xl backdrop-blur-xl sm:max-w-[760px]"
       description={t.searchDialog.description}
-      onOpenChange={setOpen}
+      onOpenChange={closeSearchDialog}
       open={open}
       title={t.searchDialog.title}
     >
@@ -131,17 +132,17 @@ export function GlobalSearchDialog() {
           <CommandInput
             onValueChange={(nextValue) => {
               if (nextValue.startsWith("/k ")) {
-                setMode("keyword")
+                setSearchMode("keyword")
                 setInput(nextValue.slice(3))
                 return
               }
               if (nextValue.startsWith("/s ")) {
-                setMode("semantic")
+                setSearchMode("semantic")
                 setInput(nextValue.slice(3))
                 return
               }
               if (nextValue.startsWith("/h ")) {
-                setMode("hybrid")
+                setSearchMode("hybrid")
                 setInput(nextValue.slice(3))
                 return
               }
@@ -159,7 +160,7 @@ export function GlobalSearchDialog() {
                     : "rounded-md px-2.5 py-1 text-muted-foreground text-xs transition hover:text-foreground"
                 }
                 key={itemMode}
-                onClick={() => setMode(itemMode)}
+                onClick={() => setSearchMode(itemMode)}
                 type="button"
               >
                 {modeLabels[itemMode]}
@@ -202,7 +203,7 @@ export function GlobalSearchDialog() {
                   className="items-start gap-3 rounded-md px-3 py-3"
                   key={item.id}
                   onSelect={() => {
-                    setOpen(false)
+                    closeSearchDialog()
                     router.push(`/bookmark/${item.id}`)
                   }}
                   value={`${item.id}-${item.title}`}

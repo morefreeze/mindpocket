@@ -1,7 +1,7 @@
 "use client"
 
 import { Check, FolderMinus, Loader2, Plus } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -12,12 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-
-interface FolderItem {
-  id: string
-  name: string
-  emoji: string | null
-}
+import { useFolderStore } from "@/stores"
 
 interface MoveToFolderDialogProps {
   open: boolean
@@ -35,32 +30,12 @@ export function MoveToFolderDialog({
   onMoved,
 }: MoveToFolderDialogProps) {
   const t = useT()
-  const [folders, setFolders] = useState<FolderItem[]>([])
-  const [loading, setLoading] = useState(false)
+  const { folders, isLoading, fetchFolders, createFolder } = useFolderStore()
   const [moving, setMoving] = useState(false)
   const [creating, setCreating] = useState(false)
   const [newFolderName, setNewFolderName] = useState("")
   const [showNewFolder, setShowNewFolder] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-
-  const fetchFolders = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch("/api/folders")
-      if (res.ok) {
-        const data = await res.json()
-        setFolders(
-          data.folders.map((f: FolderItem & { items?: unknown }) => ({
-            id: f.id,
-            name: f.name,
-            emoji: f.emoji,
-          }))
-        )
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [])
 
   useEffect(() => {
     if (open) {
@@ -104,18 +79,8 @@ export function MoveToFolderDialog({
     }
     setCreating(true)
     try {
-      const res = await fetch("/api/folders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        const created = data.folder as FolderItem
-        setFolders((prev) => [
-          ...prev,
-          { id: created.id, name: created.name, emoji: created.emoji },
-        ])
+      const created = await createFolder(name)
+      if (created) {
         setNewFolderName("")
         setShowNewFolder(false)
       }
@@ -133,7 +98,7 @@ export function MoveToFolderDialog({
         </DialogHeader>
 
         <div className="flex max-h-64 flex-col gap-1 overflow-y-auto">
-          {loading ? (
+          {isLoading ? (
             <div className="flex items-center justify-center py-6">
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
             </div>
@@ -153,7 +118,7 @@ export function MoveToFolderDialog({
               )}
 
               {/* Folder list */}
-              {folders.length === 0 && !loading && (
+              {folders.length === 0 && !isLoading && (
                 <p className="py-4 text-center text-muted-foreground text-sm">
                   {t.bookmark.noFolders}
                 </p>

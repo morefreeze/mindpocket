@@ -44,7 +44,6 @@ import {
   XiaohongshuIcon,
 } from "@/components/icons/platform-icons"
 import { NavUser } from "@/components/nav-user"
-import { useSearchDialog } from "@/components/search/search-dialog-provider"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   DropdownMenu,
@@ -78,26 +77,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import { useT } from "@/lib/i18n"
-
-interface ChatItem {
-  id: string
-  title: string
-  createdAt: string
-}
-
-interface FolderItem {
-  id: string
-  name: string
-  emoji: string
-  sortOrder: number
-  items: { id: string; title: string }[]
-}
-
-interface UserInfo {
-  name: string
-  email: string
-  avatar: string
-}
+import { useChatStore, useFolderStore, useUIStore, useUserStore } from "@/stores"
 
 const socialLinks = [
   { name: "GitHub", icon: GithubIcon, url: "https://github.com/jihe520/mindpocket" },
@@ -115,16 +95,32 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
   const pathname = usePathname()
   const router = useRouter()
   const t = useT()
-  const { openSearchDialog } = useSearchDialog()
-  const [chats, setChats] = useState<ChatItem[]>([])
-  const [isLoadingChats, setIsLoadingChats] = useState(true)
-  const [folders, setFolders] = useState<FolderItem[]>([])
-  const [isLoadingFolders, setIsLoadingFolders] = useState(true)
-  const [userInfo, setUserInfo] = useState<UserInfo>({ name: "", email: "", avatar: "" })
+
+  // Zustand stores
+  const { openSearchDialog } = useUIStore()
+  const { showAllChats, setShowAllChats } = useUIStore()
+  const { userInfo, fetchUser } = useUserStore()
+  const {
+    chats,
+    isLoading: isLoadingChats,
+    fetchChats,
+    deleteChat: deleteChatFromStore,
+  } = useChatStore()
+  const {
+    folders,
+    isLoading: isLoadingFolders,
+    fetchFolders,
+    createFolder: createFolderInStore,
+    deleteFolder: deleteFolderFromStore,
+    updateFolderEmoji,
+    reorderFolders: reorderFoldersInStore,
+    moveBookmarkToFolder: moveBookmarkInStore,
+    removeBookmarkFromFolder,
+  } = useFolderStore()
+
   const [isCreatingFolder, setIsCreatingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState("")
   const newFolderInputRef = useRef<HTMLInputElement>(null)
-  const [showAllChats, setShowAllChats] = useState(false)
 
   // dnd-kit state
   const [activeDrag, setActiveDrag] = useState<{
@@ -138,60 +134,14 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
 
   // 初始加载文件夹和用户信息（只加载一次）
   useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
-        const [foldersRes, userRes] = await Promise.all([fetch("/api/folders"), fetch("/api/user")])
-        if (cancelled) {
-          return
-        }
-
-        if (foldersRes.ok) {
-          const data = await foldersRes.json()
-          setFolders(data.folders)
-        }
-        if (userRes.ok) {
-          const data = await userRes.json()
-          setUserInfo(data)
-        }
-      } catch {
-        // silently fail
-      } finally {
-        if (!cancelled) {
-          setIsLoadingFolders(false)
-        }
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    fetchFolders()
+    fetchUser()
+  }, [fetchFolders, fetchUser])
 
   // 聊天记录随 pathname 变化重新加载
   useEffect(() => {
-    // pathname 变化时触发重新加载（如创建/删除聊天后）
-    const _path = pathname
-    let cancelled = false
-    async function load() {
-      try {
-        const res = await fetch("/api/history?limit=20")
-        if (res.ok && !cancelled) {
-          setChats((await res.json()).chats)
-        }
-      } catch {
-        // silently fail
-      } finally {
-        if (!cancelled) {
-          setIsLoadingChats(false)
-        }
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [pathname])
+    fetchChats(true) // Force refresh on pathname change
+  }, [fetchChats])
 
   const handleCreateFolder = useCallback(async () => {
     const name = newFolderName.trim()
@@ -200,26 +150,15 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
       setNewFolderName("")
       return
     }
-    try {
-      const res = await fetch("/api/folders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setFolders((prev) => [...prev, data.folder])
-        toast.success(t.sidebar.folderCreated)
-      } else {
-        toast.error(t.sidebar.folderCreateFailed)
-      }
-    } catch {
+    const folder = await createFolderInStore(name)
+    if (folder) {
+      toast.success(t.sidebar.folderCreated)
+    } else {
       toast.error(t.sidebar.folderCreateFailed)
-    } finally {
-      setIsCreatingFolder(false)
-      setNewFolderName("")
     }
-  }, [newFolderName, t])
+    setIsCreatingFolder(false)
+    setNewFolderName("")
+  }, [newFolderName, t, createFolderInStore])
 
   const handleDeleteChat = useCallback(
     async (e: React.MouseEvent, chatId: string) => {
@@ -232,7 +171,7 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
           body: JSON.stringify({ id: chatId }),
         })
         if (res.ok) {
-          setChats((prev) => prev.filter((c) => c.id !== chatId))
+          deleteChatFromStore(chatId)
           if (pathname === `/chat/${chatId}`) {
             router.push("/chat")
           }
@@ -242,29 +181,22 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
         toast.error(t.sidebar.chatDeleteFailed)
       }
     },
-    [pathname, router, t]
+    [pathname, router, t, deleteChatFromStore]
   )
 
   const handleDeleteFolder = useCallback(
     async (folderId: string) => {
-      try {
-        const res = await fetch("/api/folders", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: folderId }),
-        })
-        if (res.ok) {
-          setFolders((prev) => prev.filter((f) => f.id !== folderId))
-          if (pathname === `/folders/${folderId}`) {
-            router.push("/")
-          }
-          toast.success(t.sidebar.folderDeleted)
+      const success = await deleteFolderFromStore(folderId)
+      if (success) {
+        if (pathname === `/folders/${folderId}`) {
+          router.push("/")
         }
-      } catch {
+        toast.success(t.sidebar.folderDeleted)
+      } else {
         toast.error(t.sidebar.folderDeleteFailed)
       }
     },
-    [pathname, router, t]
+    [pathname, router, t, deleteFolderFromStore]
   )
 
   const handleDeleteBookmark = useCallback(
@@ -276,12 +208,12 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
           method: "DELETE",
         })
         if (res.ok) {
-          setFolders((prev) =>
-            prev.map((folder) => ({
-              ...folder,
-              items: folder.items.filter((item) => item.id !== bookmarkId),
-            }))
-          )
+          // Remove from all folders
+          for (const folder of folders) {
+            if (folder.items.some((item) => item.id === bookmarkId)) {
+              removeBookmarkFromFolder(folder.id, bookmarkId)
+            }
+          }
           if (pathname === `/bookmark/${bookmarkId}`) {
             router.push("/")
           }
@@ -293,30 +225,17 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
         toast.error(t.sidebar.bookmarkDeleteFailed)
       }
     },
-    [pathname, router, t]
+    [pathname, router, t, folders, removeBookmarkFromFolder]
   )
 
   const handleEmojiChange = useCallback(
     async (folderId: string, emoji: string) => {
-      const prevFolders = folders
-      setFolders((prev) => prev.map((f) => (f.id === folderId ? { ...f, emoji } : f)))
-
-      try {
-        const res = await fetch(`/api/folders/${folderId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ emoji }),
-        })
-        if (!res.ok) {
-          setFolders(prevFolders)
-          toast.error(t.sidebar.emojiChangeFailed)
-        }
-      } catch {
-        setFolders(prevFolders)
+      const success = await updateFolderEmoji(folderId, emoji)
+      if (!success) {
         toast.error(t.sidebar.emojiChangeFailed)
       }
     },
-    [folders, t]
+    [t, updateFolderEmoji]
   )
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -336,61 +255,25 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
 
   const moveBookmarkToFolder = useCallback(
     async (bookmarkId: string, sourceFolderId: string, targetFolderId: string, title: string) => {
-      const prevFolders = folders
-      setFolders((prev) =>
-        prev.map((f) => {
-          if (f.id === sourceFolderId) {
-            return { ...f, items: f.items.filter((item) => item.id !== bookmarkId) }
-          }
-          if (f.id === targetFolderId) {
-            return { ...f, items: [{ id: bookmarkId, title }, ...f.items].slice(0, 5) }
-          }
-          return f
-        })
-      )
-
-      try {
-        const res = await fetch(`/api/bookmarks/${bookmarkId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ folderId: targetFolderId }),
-        })
-        if (res.ok) {
-          toast.success(t.sidebar.bookmarkMoved ?? "已移动")
-        } else {
-          setFolders(prevFolders)
-          toast.error(t.sidebar.bookmarkMoveFailed ?? "移动失败")
-        }
-      } catch {
-        setFolders(prevFolders)
-        toast.error(t.sidebar.bookmarkMoveFailed ?? "移动失败")
+      const success = await moveBookmarkInStore(bookmarkId, sourceFolderId, targetFolderId, title)
+      if (success) {
+        toast.success("已移动")
+      } else {
+        toast.error("移动失败")
       }
     },
-    [folders, t]
+    [moveBookmarkInStore]
   )
 
   const reorderFolders = useCallback(
     async (oldIndex: number, newIndex: number) => {
       const reordered = arrayMove(folders, oldIndex, newIndex)
-      const prevFolders = folders
-      setFolders(reordered)
-
-      try {
-        const res = await fetch("/api/folders", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderedIds: reordered.map((f) => f.id) }),
-        })
-        if (!res.ok) {
-          setFolders(prevFolders)
-          toast.error(t.sidebar.folderReorderFailed ?? "排序失败")
-        }
-      } catch {
-        setFolders(prevFolders)
-        toast.error(t.sidebar.folderReorderFailed ?? "排序失败")
+      const success = await reorderFoldersInStore(reordered.map((f) => f.id))
+      if (!success) {
+        toast.error("排序失败")
       }
     },
-    [folders, t]
+    [folders, reorderFoldersInStore]
   )
 
   const handleDragEnd = useCallback(
@@ -765,7 +648,9 @@ function FolderMenuItem({
       <SidebarMenuItem ref={setNodeRef} style={style}>
         <Popover
           onOpenChange={(v) => {
-            if (!v && Date.now() - emojiPickerOpenedAt.current < 300) return
+            if (!v && Date.now() - emojiPickerOpenedAt.current < 300) {
+              return
+            }
             setEmojiPickerOpen(v)
           }}
           open={emojiPickerOpen}
