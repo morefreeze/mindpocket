@@ -78,7 +78,7 @@ export function SettingsAiModel() {
           baseUrl: form.baseUrl,
           modelId: form.modelId,
         }
-        if (form.apiKey !== "••••••••") {
+        if (form.apiKey !== "********") {
           body.apiKey = form.apiKey
         }
         const res = await fetch(`/api/ai-providers/${editingId}`, {
@@ -149,7 +149,7 @@ export function SettingsAiModel() {
       name: provider.name,
       type: provider.type as "chat" | "embedding",
       baseUrl: provider.baseUrl,
-      apiKey: "••••••••••••••••••••••••",
+      apiKey: "***********************",
       modelId: provider.modelId,
     })
     setShowForm(true)
