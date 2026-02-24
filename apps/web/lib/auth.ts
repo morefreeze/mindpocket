@@ -12,7 +12,8 @@ export const auth = betterAuth({
   baseURL:
     process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://127.0.0.1:3000",
   trustedOrigins: [
-    process.env.NEXT_PUBLIC_APP_URL || "http://127.0.0.1:3000",
+    process.env.BETTER_AUTH_URL?.startsWith("http") ? process.env.BETTER_AUTH_URL : process.env.BETTER_AUTH_URL ? `https://${process.env.BETTER_AUTH_URL}` : null,
+    process.env.NEXT_PUBLIC_APP_URL,
     process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
     "chrome-extension://*",
     "http://127.0.0.1:3000",
@@ -21,7 +22,7 @@ export const auth = betterAuth({
     "mindpocket://",
     "exp://",
     "exp://**",
-  ].filter(Boolean),
+  ].filter(Boolean) as string[],
   database: drizzleAdapter(db, {
     provider: "pg",
   }),
